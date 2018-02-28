@@ -59,7 +59,17 @@
     if (cache.hasOwnProperty(url) && cache[url].hasOwnProperty('lastModified')) {
       headers.append('If-Modified-Since', cache[url].lastModified);
     }
-    fetch(`${url}?access_token=${token}`, {
+
+    let searchParams = new URLSearchParams();
+    searchParams.append('access_token', token);
+
+    if (options.searchParams) {
+      for (let s in options.searchParams)
+        searchParams.append(s, options.searchParams[s]);
+      delete options.searchParams;
+    }
+
+    fetch(`${url}?${searchParams.toString()}`, {
       method,
       headers,
       mode: 'cors',
@@ -113,9 +123,16 @@
 
   $('#get-tree').onclick = () => {
     log('\nGetting tree\n');
-    let arr = [];
-    getTree(branch, '', arr);
-    setTimeout(() => {log('Results', '[\n\t' + arr.join('\n\t') + '\n]')}, 5000);
+    doAction('GET', 'git/trees/' + branch, { searchParams: { recursive: 1 } })
+      .then(json => {
+        if (!json.truncated)
+          log('Results', '[\n\t' + json.tree.filter(t => t.type == 'blob').map(t => t.path).join('\n\t') + '\n]');
+        else {
+          let arr = [];
+          getTree(branch, '', arr);
+          setTimeout(() => {log('Results', '[\n\t' + arr.join('\n\t') + '\n]')}, 5000);
+        }
+      });
   };
 
   $('#create-commit').onclick = function() {
