@@ -2,15 +2,17 @@
   const $ = (ctx, sel) => (!sel ? document : ctx).querySelector(sel || ctx);
   const BASE_URL = 'https://api.github.com';
 
-  const log = (toAdd, children=null) => {
-    if (children == null)
+  const log = (toAdd, ...children) => {
+    if (!children.length)
       $('pre').insertAdjacentText('beforeend', ' ↳ ' + toAdd + '\n');
     else {
       let dummy = document.createElement('div');
-      dummy.textContent = children;
       $('pre').insertAdjacentHTML('beforeend', `<div class="log-group log-group__closed">
         <a onclick="this.parentNode.classList.toggle('log-group__closed')">${toAdd}</a>
-        ${dummy.outerHTML}
+        ${children.map(c => { 
+          dummy.textContent = c;
+          return dummy.outerHTML;
+        }).join('-------')}
       </div>`);
     }
   };
@@ -81,7 +83,10 @@
         return resp.text()
       })
       .then(body => {
-        log(`${method}: ${BASE_URL}/repos/${repo}/${endpoint}`, body);
+        if (options.body)
+          log(`${method}: ${BASE_URL}/repos/${repo}/${endpoint}`, options.body, body);
+        else
+          log(`${method}: ${BASE_URL}/repos/${repo}/${endpoint}`, body);
         res(JSON.parse(body));
       });
   });
