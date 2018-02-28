@@ -11,18 +11,33 @@
   .log-group a::before {content:'[-]  '}
   .log-group__closed a::before {content:'[+]  '}
   .log-group div {white-space:pre}
-  .log-group__closed div {display:none}</style>
+  .log-group__closed div {display:none}
+  .hidden {display:none}</style>
 </head>
 <body>
   <form id="login">
     <input type="password" id="token" placeholder="token">
     <input type="text" id="repo" placeholder="owner/repo">
+    <input type="text" id="branch" placeholder="sha">
     <button id="token-submit">Submit</button>
   </form>
   <form id="action">
-    <button id="get-commit">Get latest commit</button>
-    <button id="get-tree">Recursively get tree</button>
-    <button id="create-commit">Create commit</button>
+    <button id="get-commit" disabled>Get latest commit</button>
+    <button id="get-tree" disabled>Recursively get tree</button>
+    <button id="create-commit" disabled>Create commit</button>
+    <div class="hidden">
+      <input type="text" id="commit-msg" placeholder="commit msg" maxlength=50>
+      <hr>
+      <div class="commit-templ hidden">
+        <input type="text" class="commit-templ-filename" placeholder="filename">
+        <br>
+        <textarea placeholder="contents"></textarea>
+        <button>Remove</button>
+        <hr>
+      </div>
+      <button id="create-commit-dupl-templ">Add file</button><br>
+      <button id="create-commit-submit">Submit</button>
+    </div>
   </form>
   <a href="#" onclick="document.querySelector('pre').textContent='';event.preventDefault()">Clear log</a>
   <pre></pre>

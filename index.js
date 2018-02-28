@@ -21,11 +21,12 @@
 
   let token = null;
   let repo = null;
+  let branch = null;
 
   $('#token-submit').onclick = () => {
     let passedToken = $('#token').value;
 
-    fetch(BASE_URL + '?access_token=' + passedToken, {
+    fetch(BASE_URL + '/rate_limit?access_token=' + passedToken, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
@@ -38,22 +39,46 @@
         return resp.text();
       })
       .then(body => {
-        log('GET: ' + BASE_URL + '?access_token=!!!!', body);
+        log('GET: ' + BASE_URL + '/rate_limit?access_token=!!!!', body);
+        if (token) {
+          document.querySelectorAll('button').forEach(b => b.disabled = false);
+        }
       });
     repo = $('#repo').value;
+    branch = $('#branch').value;
   };
 
+  let cache = {};
+
   const doAction = (method, endpoint, options = {}) => new Promise((res, rej) => {
-    fetch(`${BASE_URL}/repos/${repo}/${endpoint}?access_token=${token}`, {
+    const url = `${BASE_URL}/repos/${repo}/${endpoint}`;
+    let headers = new Headers();
+    headers.append('Accept', 'application/json');
+    if (cache.hasOwnProperty(url) && cache[url].hasOwnProperty('lastModified')) {
+      console.dir(cache[url]);
+      headers.append('If-Modified-Since', cache[url].lastModified);
+    }
+    fetch(`${url}?access_token=${token}`, {
       method,
-      headers: {
-        'Accept': 'application/json'
-      },
+      headers,
       mode: 'cors',
       ...options
     })
       .then(resp => {
-        if (!resp.ok) rej(log('Bad request!'))
+        if (300 <= resp.status && resp.status < 400) {
+          log('Returning from cache')
+          return Promise.resolve(cache[url].json);
+        } else if (resp.ok) {
+          return resp.text().then(text => {
+            let thing = { json: text };
+            if (resp.headers.has('Last-Modified'))
+              thing.lastModified = resp.headers.get('Last-Modified')
+            cache[url] = thing;
+            return Promise.resolve(text);
+          });
+        } else {
+          rej(log('Bad request!'))
+        }
         return resp.text()
       })
       .then(body => {
@@ -64,7 +89,7 @@
 
   $('#get-commit').onclick = () => {
     log('\nGetting latest commit\n');
-    doAction('GET', 'commits/master')
+    doAction('GET', 'commits/' + branch)
       .then(json => {
         log(json.sha)
       });
@@ -85,7 +110,22 @@
   $('#get-tree').onclick = () => {
     log('\nGetting tree\n');
     let arr = [];
-    getTree('master', '', arr);
+    getTree(branch, '', arr);
     setTimeout(() => {log('Results', '[\n\t' + arr.join('\n\t') + '\n]')}, 5000);
   };
+
+  $('#create-commit').onclick = function() {
+    this.nextElementSibling.classList.toggle('hidden');
+  };
+
+  $('#create-commit-dupl-templ').onclick = function() {
+    let node = $('.commit-templ').cloneNode(true);
+    node.className = 'commit-file';
+    $(node, 'button').onclick = () => { node.remove() };
+    this.insertAdjacentElement('beforebegin', node);
+  };
+
+  $('#create-commit-submit').onclick = () => {
+    // what
+  }
 })();
