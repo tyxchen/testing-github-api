@@ -55,7 +55,6 @@
     let headers = new Headers();
     headers.append('Accept', 'application/json');
     if (cache.hasOwnProperty(url) && cache[url].hasOwnProperty('lastModified')) {
-      console.dir(cache[url]);
       headers.append('If-Modified-Since', cache[url].lastModified);
     }
     fetch(`${url}?access_token=${token}`, {
@@ -127,5 +126,36 @@
 
   $('#create-commit-submit').onclick = () => {
     // what
+    doAction('GET', 'commits/' + branch)
+      .then(json => {
+        let base_tree = json.sha,
+            tree = [];
+
+        // create tree
+        for (let i of document.querySelectorAll('.commit-file')) {
+          let path = $(i, '.commit-templ-filename').value,
+              content = $(i, 'textarea').value;
+
+          tree.push({ path, content, mode: '100644', type: 'blob' })
+        }
+
+        doAction('POST', 'git/trees', { body: JSON.stringify({ base_tree, tree }) })
+          .then(json => {
+            let body = JSON.stringify({
+              message: $('#commit-msg').value,
+              tree: json.sha, 
+              parents: [ base_tree ]
+            });
+            doAction('POST', 'git/commits', { body })
+              .then(json => {
+                doAction('PATCH', 'git/refs/heads/' + branch, {
+                  body: JSON.stringify({
+                    sha: json.sha
+                  })
+                })
+                  .then(json => log(json.object.sha));
+              });
+          })
+      });
   }
 })();
