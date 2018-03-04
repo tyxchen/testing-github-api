@@ -53,7 +53,7 @@
   let cache = {};
 
   const doAction = (method, endpoint, options = {}) => new Promise((res, rej) => {
-    const url = `${BASE_URL}/repos/${repo}/${endpoint}`;
+    const url = `${BASE_URL}/repos/${repo}/${endpoint}#${encodeURIComponent(JSON.stringify(options.params))}`;
     let headers = new Headers();
     headers.append('Accept', 'application/json');
     if (cache.hasOwnProperty(url) && cache[url].hasOwnProperty('lastModified')) {
@@ -63,13 +63,13 @@
     let searchParams = new URLSearchParams();
     searchParams.append('access_token', token);
 
-    if (options.searchParams) {
-      for (let s in options.searchParams)
-        searchParams.append(s, options.searchParams[s]);
-      delete options.searchParams;
+    if (options.params) {
+      for (let s in options.params)
+        searchParams.append(s, options.params[s]);
+      delete options.params;
     }
 
-    fetch(`${url}?${searchParams.toString()}`, {
+    fetch(`${url.split('#')[0]}?${searchParams.toString()}`, {
       method,
       headers,
       mode: 'cors',
@@ -94,9 +94,9 @@
       })
       .then(body => {
         if (options.body)
-          log(`${method}: ${BASE_URL}/repos/${repo}/${endpoint}`, options.body, body);
+          log(`${method}: ${url.split('#')[0]}?${searchParams.toString()}`, options.body, body);
         else
-          log(`${method}: ${BASE_URL}/repos/${repo}/${endpoint}`, body);
+          log(`${method}: ${url.split('#')[0]}?${searchParams.toString()}`, body);
         res(JSON.parse(body));
       });
   });
@@ -123,7 +123,7 @@
 
   $('#get-tree').onclick = () => {
     log('\nGetting tree\n');
-    doAction('GET', 'git/trees/' + branch, { searchParams: { recursive: 1 } })
+    doAction('GET', 'git/trees/' + branch, { params: { recursive: 1 } })
       .then(json => {
         if (!json.truncated)
           log('Results', '[\n\t' + json.tree.filter(t => t.type == 'blob').map(t => t.path).join('\n\t') + '\n]');
@@ -135,6 +135,72 @@
       });
   };
 
+  const getElem = (obj, keys) => {
+    if (keys.length == 0) return obj;
+    else return getElem(obj[keys[0]], keys.slice(1));
+  };
+  const setElem = (obj, keys, content) => {
+    if (keys.length == 0) return;
+    else if (keys.length == 1) return obj[keys[0]] = content;
+    else return setElem(obj[keys[0]], keys.slice(1), content);
+  };
+
+  let files = {};
+
+  const autocomplete = function(elem) {
+    let datalist = $('#get-file-autocomplete'),
+        value = this.value,
+        pre = value.split('/').slice(0, -1);
+    let things = [];
+    // autocomplete
+    if (datalist.dataset.query != pre.join('/')) {
+      try {
+        things = getElem(files, pre);
+      } catch (e) {}
+
+      let builder = [];
+      for (let f in things) {
+        builder.push(`<option>${pre.join('/') + (pre.length ? '/' : '')}${f + (typeof things[f] === 'string' ? '' : '/')}</option>`);
+      }
+      datalist.innerHTML = builder.join('');
+      datalist.dataset.query = pre.join('/');
+    }
+  };
+
+  $('#get-file').onclick = function() {
+    if (this.nextElementSibling.classList.contains('hidden')) {
+      doAction('GET', 'git/trees/' + branch, { params: { recursive: 1 } })
+        .then(json => {
+          for (let t of json.tree) {
+            let path = t.path.split('/');
+            if (t.type == 'blob') {
+              setElem(files, path, t.sha);
+            } else if (t.type == 'tree') {
+              setElem(files, path, {});
+            }
+          }
+        });
+    }
+    this.nextElementSibling.classList.toggle('hidden');
+  };
+
+  $('#get-file-path').onkeyup = autocomplete.bind($('#get-file-path'));
+
+  $('#get-file-submit').onclick = () => {
+    let value = $('#get-file-path').value,
+        isSha = /^[0-9a-f]{40}$/i.test(value);
+
+    if (!isSha) value = getElem(files, value.split('/'));
+
+    doAction('GET', 'git/blobs/' + value)
+      .then(json => {
+        if (json.content)
+          log(value, atob(json.content));
+        else
+          log('Not a file!');
+      });
+  };
+
   $('#create-commit').onclick = function() {
     this.nextElementSibling.classList.toggle('hidden');
   };
@@ -142,6 +208,7 @@
   $('#create-commit-dupl-templ').onclick = function() {
     let node = $('.commit-templ').cloneNode(true);
     node.className = 'commit-file';
+    $(node, 'input').onkeyup = autocomplete.bind($(node, 'input'));
     $(node, 'button').onclick = () => { node.remove() };
     this.insertAdjacentElement('beforebegin', node);
   };

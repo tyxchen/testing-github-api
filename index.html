@@ -24,12 +24,19 @@
   <form id="action">
     <button id="get-commit" disabled>Get latest commit</button>
     <button id="get-tree" disabled>Recursively get tree</button>
+    <button id="get-file" disabled>Get file</button>
+    <div class="hidden">
+      <input type="text" list="get-file-autocomplete" id="get-file-path" placeholder="path or sha">
+      <datalist id="get-file-autocomplete">
+      </datalist>
+      <button id="get-file-submit">Submit</button>
+    </div>
     <button id="create-commit" disabled>Create commit</button>
     <div class="hidden">
       <input type="text" id="commit-msg" placeholder="commit msg" maxlength=50>
       <hr>
       <div class="commit-templ hidden">
-        <input type="text" class="commit-templ-filename" placeholder="filename">
+        <input type="text" class="commit-templ-filename" list="get-file-autocomplete" placeholder="filename">
         <br>
         <textarea placeholder="contents"></textarea>
         <button>Remove</button>
