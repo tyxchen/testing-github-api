@@ -28,10 +28,11 @@
   $('#token-submit').onclick = () => {
     let passedToken = $('#token').value;
 
-    fetch(BASE_URL + '/rate_limit?access_token=' + passedToken, {
+    fetch(BASE_URL + '/rate_limit', {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Authorization': 'token ' + passedToken
       },
       mode: 'cors'
     })
@@ -41,7 +42,7 @@
         return resp.text();
       })
       .then(body => {
-        log('GET: ' + BASE_URL + '/rate_limit?access_token=!!!!', body);
+        log('GET: ' + BASE_URL + '/rate_limit', body);
         if (token) {
           document.querySelectorAll('button').forEach(b => b.disabled = false);
         }
@@ -56,20 +57,21 @@
     const url = `${BASE_URL}/repos/${repo}/${endpoint}#${encodeURIComponent(JSON.stringify(options.params))}`;
     let headers = new Headers();
     headers.append('Accept', 'application/json');
+    headers.append('Authorization', 'token ' + token);
     if (cache.hasOwnProperty(url) && cache[url].hasOwnProperty('lastModified')) {
       headers.append('If-Modified-Since', cache[url].lastModified);
     }
 
     let searchParams = new URLSearchParams();
-    searchParams.append('access_token', token);
 
     if (options.params) {
       for (let s in options.params)
         searchParams.append(s, options.params[s]);
+      searchParams = '?' + searchParams.toString();
       delete options.params;
     }
 
-    fetch(`${url.split('#')[0]}?${searchParams.toString()}`, {
+    fetch(`${url.split('#')[0]}${searchParams}`, {
       method,
       headers,
       mode: 'cors',
@@ -94,9 +96,9 @@
       })
       .then(body => {
         if (options.body)
-          log(`${method}: ${url.split('#')[0]}?${searchParams.toString()}`, options.body, body);
+          log(`${method}: ${url.split('#')[0]}${searchParams}`, options.body, body);
         else
-          log(`${method}: ${url.split('#')[0]}?${searchParams.toString()}`, body);
+          log(`${method}: ${url.split('#')[0]}${searchParams}`, body);
         res(JSON.parse(body));
       });
   });
