@@ -21,12 +21,69 @@
     f.onsubmit = () => false;
   });
 
-  let token = null;
+  const makeCryptoRandomHash = () => {
+    let buffer = new Uint32Array(10);
+    window.crypto.getRandomValues(buffer);
+
+    // https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest
+    return window.crypto.subtle.digest("SHA-256", buffer).then(hash => {
+      const hashArray = Array.from(new Uint8Array(hash));
+      return hashArray.map(b => ('00' + b.toString(16)).slice(-2)).join('');
+    });
+  };
+
+  let token = sessionStorage.getItem('token');
   let repo = null;
   let branch = null;
 
-  $('#token-submit').onclick = () => {
-    let passedToken = $('#token').value;
+  $('#login-oauth').onclick = async function() {
+    if (this.classList.contains('logged-in')) return;
+
+    const _this = this;
+    const client_id = '5966992b5cf661dc9908';
+    const state = await makeCryptoRandomHash();
+    let popup = window.open(`https://github.com/login/oauth/authorize?client_id=${client_id}&scope=repo&state=${state}`, "GitHub_OAuth_Identity", "height=720,width=600,dependent");
+    const messageHandler = (event) => {
+      if (event.origin !== location.origin) throw new Error('Auth error: authentication message from incorrect origin');
+
+      window.removeEventListener('message', messageHandler);
+          
+      // event.data is the code and CORS state
+      let params = new URLSearchParams(event.data);
+
+      if (params.get('state') !== state) throw new Error('OAuth error: bad state received');
+
+      fetch("https://foam-quiver.glitch.me/oauth", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        cache: 'no-cache',
+        body: JSON.stringify({
+          client_id,
+          state,
+          code: params.get('code')
+        })
+      })
+        .then(resp => {
+          if (resp.ok) return resp.json();
+        })
+        .then(json => {
+          token = json.access_token;
+          sessionStorage.setItem("token", token);
+          _this.classList.add('logged-in');
+          _this.textContent = 'Logged in';
+
+          popup.close();
+          console.log('success!')
+        });
+    };
+    window.addEventListener('message', messageHandler);
+  };
+
+  $('#token-submit').onclick = function() {
+    let passedToken = token || $('#token').value;
 
     fetch(BASE_URL + '/rate_limit', {
       method: 'GET',
@@ -37,8 +94,12 @@
       mode: 'cors'
     })
       .then(resp => {
-        if (resp.ok) token = passedToken;
-        else log('Bad token!')
+        if (resp.ok) {
+          token = passedToken;
+          sessionStorage.setItem("token", token);
+          $('#login-oauth').classList.add('logged-in');
+          $('#login-oauth').textContent = 'Logged in';
+        } else log('Bad token!')
         return resp.text();
       })
       .then(body => {
